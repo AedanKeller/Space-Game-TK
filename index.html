@@ -339,9 +339,11 @@
         const BASE_SPEED = 3;
         const THRUSTER_BONUS = 2.5;
         const CHAIR_ENTER_DIST = GRID * 2;
-        const SYSTEM_CELL = GRID * 400;   // spacing between star systems
+        const SYSTEM_CELL = GRID * 640;   // spacing between star systems
         const ZOOM_MIN = 0.15, ZOOM_MAX = 3;
+        const LAND_DIST = GRID * 12;      // how close to a planet/moon before the camera tilts
         let zoom = 1;
+        let camRot = 0;                   // camera rotation while "landed" on a body
 
         // worldParts: { x, y, partId, rotation }
         const worldParts = [];
@@ -676,7 +678,7 @@
             const hue = Math.floor(rng() * 360);
             const sat = kind === "moon" ? 5 + rng() * 25 : 25 + rng() * 50;
             const light = 30 + rng() * 30;
-            const body = { kind, x, y, r, color: `hsl(${hue},${sat}%,${light}%)`, atmoR: 0, cubes: [], bumps: [] };
+            const body = { kind, x, y, r, color: `hsl(${hue},${sat}%,${light}%)`, atmoR: 0, cubes: [], bumps: [], rocks: [] };
             if (rng() < (kind === "planet" ? 0.8 : 0.35)) {
                 body.atmoR = r * (1.8 + rng() * 1.2);
                 body.atmoHue = (hue + rng() * 60 - 30 + 360) % 360;
@@ -698,6 +700,19 @@
                     color: `hsl(${hue},${sat}%,${Math.max(10, light - 8 + rng() * 16)}%)`
                 });
             }
+            // small surface rock bits — amount/size vary per body, some have none
+            if (rng() < (kind === "planet" ? 0.7 : 0.55)) {
+                const rockScale = 0.6 + rng() * 1.8;
+                const rockCount = Math.floor((kind === "planet" ? 10 : 4) + rng() * (kind === "planet" ? 34 : 14));
+                for (let i = 0; i < rockCount; i++) {
+                    const a = rng() * Math.PI * 2;
+                    const s = (5 + rng() * 12) * rockScale;
+                    body.rocks.push({
+                        a, s, d: r + s * 0.2, rot: rng() * Math.PI,
+                        color: `hsl(${hue},${sat}%,${Math.max(6, light - 14 + rng() * 18)}%)`
+                    });
+                }
+            }
             return body;
         }
 
@@ -708,23 +723,23 @@
             if (rng() < 0.25) return sys;
             const cx = (sx + 0.25 + rng() * 0.5) * SYSTEM_CELL;
             const cy = (sy + 0.25 + rng() * 0.5) * SYSTEM_CELL;
-            const starR = (12 + rng() * 6) * GRID;
-            sys.bodies.push({ kind: "star", x: cx, y: cy, r: starR, atmoR: 0, cubes: [], bumps: [] });
+            const starR = (30 + rng() * 15) * GRID;
+            sys.bodies.push({ kind: "star", x: cx, y: cy, r: starR, atmoR: 0, cubes: [], bumps: [], rocks: [] });
 
             const planetCount = 2 + Math.floor(rng() * 4);
-            let orbit = starR + 1800 + rng() * 1500;
+            let orbit = starR + 3500 + rng() * 2500;
             for (let i = 0; i < planetCount && orbit < SYSTEM_CELL * 0.55; i++) {
-                const pr = (5 + rng() * 15) * GRID;
-                orbit += pr + 1600 + rng() * 2400;
+                const pr = (12 + rng() * 38) * GRID;
+                orbit += pr + 3000 + rng() * 4500;
                 const ang = rng() * Math.PI * 2;
                 const px = cx + Math.cos(ang) * orbit;
                 const py = cy + Math.sin(ang) * orbit;
                 sys.bodies.push(makeBody(rng, "planet", px, py, pr));
                 const moonCount = Math.floor(rng() * 3.4);
-                let mOrbit = pr + 500 + rng() * 400;
+                let mOrbit = pr + 800 + rng() * 600;
                 for (let m = 0; m < moonCount; m++) {
-                    const mr = (1.5 + rng() * 3.5) * GRID;
-                    mOrbit += mr + 300 + rng() * 900;
+                    const mr = (4 + rng() * 9) * GRID;
+                    mOrbit += mr + 500 + rng() * 1500;
                     const ma = rng() * Math.PI * 2;
                     sys.bodies.push(makeBody(rng, "moon", px + Math.cos(ma) * mOrbit, py + Math.sin(ma) * mOrbit, mr));
                 }
@@ -732,11 +747,11 @@
             }
 
             if (rng() < 0.65) {
-                const beltR = Math.min(orbit + 1800 + rng() * 2500, SYSTEM_CELL * 0.62);
-                const count = 30 + Math.floor(rng() * 50);
+                const beltR = Math.min(orbit + 2500 + rng() * 4000, SYSTEM_CELL * 0.62);
+                const count = 40 + Math.floor(rng() * 60);
                 for (let i = 0; i < count; i++) {
                     const a = rng() * Math.PI * 2;
-                    const d = beltR + (rng() - 0.5) * 2200;
+                    const d = beltR + (rng() - 0.5) * 3000;
                     sys.asteroids.push({
                         x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d,
                         s: (1 + rng() * 2) * GRID, rot: rng() * Math.PI,
@@ -862,8 +877,12 @@
 
         function getGridCellFromPoint(clientX, clientY) {
             const rect = canvas.getBoundingClientRect();
-            const x = (clientX - rect.left) / zoom + camX;
-            const y = (clientY - rect.top) / zoom + camY;
+            // screen offset from center, un-rotated and un-zoomed back into world space
+            const sx = clientX - rect.left - canvas.width / 2;
+            const sy = clientY - rect.top - canvas.height / 2;
+            const cos = Math.cos(camRot), sin = Math.sin(camRot);
+            const x = (sx * cos + sy * sin) / zoom + player.x + player.size / 2;
+            const y = (-sx * sin + sy * cos) / zoom + player.y + player.size / 2;
             return { x: Math.floor(x / GRID), y: Math.floor(y / GRID) };
         }
 
@@ -1215,6 +1234,14 @@
             let mx = Math.max(-1, Math.min(1, move.x + kx));
             let my = Math.max(-1, Math.min(1, move.y + ky));
 
+            // Input is screen-relative: rotate it into world space while the camera is tilted
+            if (camRot !== 0) {
+                const c = Math.cos(camRot), s = Math.sin(camRot);
+                const wmx = mx * c + my * s;
+                const wmy = -mx * s + my * c;
+                mx = wmx; my = wmy;
+            }
+
             if (seat.active) {
                 const spd = getSeatSpeed();
                 const ndx = seat.dx + mx * spd;
@@ -1246,6 +1273,27 @@
 
             camX = player.x + player.size / 2 - canvas.width / (2 * zoom);
             camY = player.y + player.size / 2 - canvas.height / (2 * zoom);
+
+            // Tilt the camera so the nearest planet/moon is "down" while on foot
+            let targetRot = 0;
+            if (!seat.active) {
+                const pcx = player.x + player.size / 2, pcy = player.y + player.size / 2;
+                let best = null, bestGap = Infinity;
+                for (const sys of nearSystems) {
+                    for (const b of sys.bodies) {
+                        if (b.kind === "star") continue;
+                        const gap = Math.hypot(pcx - b.x, pcy - b.y) - b.r;
+                        if (gap < bestGap) { bestGap = gap; best = b; }
+                    }
+                }
+                if (best && bestGap < LAND_DIST) {
+                    targetRot = Math.PI / 2 - Math.atan2(best.y - pcy, best.x - pcx);
+                }
+            }
+            let rotDiff = targetRot - camRot;
+            rotDiff = ((rotDiff + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+            camRot += rotDiff * 0.06;
+            if (targetRot === 0 && Math.abs(camRot) < 0.001) camRot = 0;
 
             if (++cullTimer >= 300) { cullTimer = 0; cullFarAway(); }
         }
@@ -1325,22 +1373,34 @@
                 ctx.fillRect(sx + c.x - c.s / 2, sy + c.y - c.s / 2, c.s, c.s);
             }
             ctx.restore();
+            // small rock bits sitting on the surface
+            for (const k of b.rocks) {
+                ctx.save();
+                ctx.translate(sx + Math.cos(k.a) * k.d, sy + Math.sin(k.a) * k.d);
+                ctx.rotate(k.a + k.rot);
+                ctx.fillStyle = k.color;
+                ctx.fillRect(-k.s / 2, -k.s / 2, k.s, k.s);
+                ctx.restore();
+            }
         }
 
         function drawCelestialBodies() {
             const viewW = canvas.width / zoom, viewH = canvas.height / zoom;
+            const viewDiag = Math.hypot(viewW, viewH);
+            const x0 = camX - (viewDiag - viewW) / 2, x1 = x0 + viewDiag;
+            const y0 = camY - (viewDiag - viewH) / 2, y1 = y0 + viewDiag;
             for (const sys of nearSystems) {
                 for (const b of sys.bodies) {
                     const margin = Math.max(b.atmoR, b.kind === "star" ? b.r * 6 : b.r * 1.3);
-                    if (b.x + margin < camX || b.x - margin > camX + viewW ||
-                        b.y + margin < camY || b.y - margin > camY + viewH) continue;
+                    if (b.x + margin < x0 || b.x - margin > x1 ||
+                        b.y + margin < y0 || b.y - margin > y1) continue;
                     const sx = b.x - camX, sy = b.y - camY;
                     if (b.kind === "star") drawStar(sx, sy, b.r);
                     else drawPlanet(sx, sy, b);
                 }
                 for (const a of sys.asteroids) {
-                    if (a.x + a.s < camX || a.x - a.s > camX + viewW ||
-                        a.y + a.s < camY || a.y - a.s > camY + viewH) continue;
+                    if (a.x + a.s < x0 || a.x - a.s > x1 ||
+                        a.y + a.s < y0 || a.y - a.s > y1) continue;
                     ctx.save();
                     ctx.translate(a.x - camX, a.y - camY);
                     ctx.rotate(a.rot);
@@ -1434,18 +1494,26 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(camRot);
+            ctx.translate(-canvas.width / 2, -canvas.height / 2);
             ctx.scale(zoom, zoom);
             const viewW = canvas.width / zoom, viewH = canvas.height / zoom;
+            // pad bounds so rotated screen corners stay covered
+            const viewDiag = Math.hypot(viewW, viewH);
+            const padX = (viewDiag - viewW) / 2, padY = (viewDiag - viewH) / 2;
 
             // Grid lines (hidden when zoomed far out)
             if (zoom > 0.45) {
                 ctx.strokeStyle = "#1a1a1a";
                 ctx.lineWidth = 1 / zoom;
-                for (let x = -camX % GRID; x < viewW; x += GRID) {
-                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, viewH); ctx.stroke();
+                const gx0 = Math.floor((camX - padX) / GRID) * GRID - camX;
+                for (let x = gx0; x < viewW + padX; x += GRID) {
+                    ctx.beginPath(); ctx.moveTo(x, -padY); ctx.lineTo(x, viewH + padY); ctx.stroke();
                 }
-                for (let y = -camY % GRID; y < viewH; y += GRID) {
-                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(viewW, y); ctx.stroke();
+                const gy0 = Math.floor((camY - padY) / GRID) * GRID - camY;
+                for (let y = gy0; y < viewH + padY; y += GRID) {
+                    ctx.beginPath(); ctx.moveTo(-padX, y); ctx.lineTo(viewW + padX, y); ctx.stroke();
                 }
                 ctx.lineWidth = 1;
             }
@@ -1484,13 +1552,15 @@
                 }
             }
 
-            // Player (hidden while seated — they're inside the chair)
+            ctx.restore();
+
+            // Player drawn screen-space at center so it stays upright while the
+            // world rotates underneath (hidden while seated — inside the chair)
             if (!seat.active) {
                 ctx.fillStyle = "cyan";
-                ctx.fillRect(player.x - camX, player.y - camY, player.size, player.size);
+                const ps = player.size * zoom;
+                ctx.fillRect((canvas.width - ps) / 2, (canvas.height - ps) / 2, ps, ps);
             }
-
-            ctx.restore();
 
             drawHUD();
             drawMinimap();
