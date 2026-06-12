@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+    <title>Space Builder</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+            font-family: sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        button,
+        input,
+        select {
+            font: inherit;
+        }
+
+        #game {
+            position: absolute;
+            inset: 0;
+            background: #050816;
+            touch-action: none;
+        }
+
+        #toolbar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+        }
+
+        #toolbar button {
+            font-size: 20px;
+            padding: 8px 12px;
+            touch-action: manipulation;
+        }
+
+        #inventory {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 106px;
+            background: #111;
+            border-top: 1px solid #333;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding: 8px;
+            z-index: 10;
+            touch-action: pan-x;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .slot {
+            width: 92px;
+            height: 90px;
+            border: 1px solid #666;
+            background: #222;
+            flex: none;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: space-between;
+            padding: 6px;
+            border-radius: 10px;
+            position: relative;
+            touch-action: manipulation;
+        }
+
+        .slot.selected {
+            outline: 3px solid #fff;
+            outline-offset: -2px;
+        }
+
+        .slot.typeChair {
+            border-color: #3a6;
+        }
+
+        .slot.typeThruster {
+            border-color: #a63;
+        }
+
+        .slotName {
+            font-size: 12px;
+            line-height: 1.15;
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding: 0 2px;
+        }
+
+        .slotMeta {
+            font-size: 11px;
+            color: #aaa;
+            text-align: center;
+        }
+
+        .slotMeta.typeChair {
+            color: #6d6;
+        }
+
+        .slotMeta.typeThruster {
+            color: #d86;
+        }
+
+        .slotActions {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .miniBtn {
+            width: 28px;
+            height: 24px;
+            padding: 0;
+            font-size: 15px;
+            line-height: 1;
+            border: 1px solid #555;
+            background: #2a2a2a;
+            color: #fff;
+            border-radius: 6px;
+            touch-action: manipulation;
+        }
+
+        #editor {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, .95);
+            display: none;
+            z-index: 20;
+            overflow: auto;
+            touch-action: none;
+        }
+
+        #editorPanel {
+            padding: 12px;
+            max-width: 100%;
+        }
+
+        #editorTop {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        #partName {
+            min-width: 180px;
+            max-width: 100%;
+            padding: 8px 10px;
+        }
+
+        #loadPartSelect {
+            min-width: 180px;
+            max-width: 100%;
+            padding: 8px 10px;
+        }
+
+        #pixelGrid {
+            display: grid;
+            grid-template-columns: repeat(16, 20px);
+            gap: 1px;
+            margin-top: 10px;
+            width: max-content;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .pix {
+            width: 20px;
+            height: 20px;
+            background: #222;
+            border: 1px solid #111;
+            touch-action: none;
+        }
+
+        #editorHint {
+            margin-top: 10px;
+            color: #bbb;
+            font-size: 13px;
+            line-height: 1.4;
+            max-width: 520px;
+        }
+
+        #joy {
+            position: absolute;
+            left: 15px;
+            bottom: 120px;
+            width: 120px;
+            height: 120px;
+            border-radius: 60px;
+            background: #3338;
+            z-index: 10;
+            touch-action: none;
+        }
+
+        #stick {
+            position: absolute;
+            left: 40px;
+            top: 40px;
+            width: 40px;
+            height: 40px;
+            border-radius: 20px;
+            background: #aaa;
+        }
+
+        .typeBtn {
+            padding: 5px 11px;
+            border: 1px solid #555;
+            background: #2a2a2a;
+            color: #888;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .typeBtn.active {
+            background: #1a2a4a;
+            border-color: #4488ff;
+            color: #88ccff;
+        }
+
+        .typeBtn.activeChair {
+            background: #1a3a2a;
+            border-color: #44bb66;
+            color: #88dd99;
+        }
+
+        .typeBtn.activeThruster {
+            background: #3a2a1a;
+            border-color: #bb6622;
+            color: #dd9944;
+        }
+
+        #sitBtn {
+            position: absolute;
+            bottom: 120px;
+            right: 15px;
+            z-index: 10;
+            display: none;
+            padding: 10px 18px;
+            font-size: 16px;
+            background: #142a1e;
+            border: 2px solid #3a9;
+            border-radius: 10px;
+            color: #7db;
+            touch-action: manipulation;
+        }
+
+        #sitBtn.exiting {
+            background: #2a1414;
+            border-color: #a44;
+            color: #d88;
+        }
+
+        @media (max-width: 700px) {
+            #inventory {
+                height: 114px;
+            }
+
+            .slot {
+                width: 104px;
+                height: 98px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="game"></canvas>
+
+    <div id="toolbar"><button id="add">+</button></div>
+
+    <div id="joy">
+        <div id="stick"></div>
+    </div>
+
+    <button id="sitBtn">Sit [E]</button>
+
+    <div id="inventory"></div>
+
+    <div id="editor" aria-hidden="true">
+        <div id="editorPanel">
+            <div id="editorTop">
+                <button id="savePart">Save Part</button>
+                <button id="cancelEditor">Cancel</button>
+                <input type="text" id="partName" placeholder="Part name">
+                <input type="color" id="color" value="#ffffff">
+                <label><input type="checkbox" id="solid" checked> Collider</label>
+                <div style="display:flex;gap:6px;align-items:center;padding:2px 0">
+                    <span style="font-size:13px;color:#aaa">Type:</span>
+                    <button class="typeBtn active" id="typeNone">None</button>
+                    <button class="typeBtn" id="typeChair">Chair</button>
+                    <button class="typeBtn" id="typeThruster">Thruster</button>
+                </div>
+                <select id="loadPartSelect"></select>
+                <button id="loadPartBtn">Load Copy</button>
+            </div>
+            <div id="pixelGrid"></div>
+            <div id="editorHint">
+                Draw by dragging. Tap a placed tile once to rotate 90°; double-tap to delete it.<br>
+                <b>Chair</b>: enter it to pilot the connected structure. <b>Thruster</b>: each one adds speed while piloting.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("game");
+        const ctx = canvas.getContext("2d");
+
+        function resize() {
+            canvas.width = innerWidth;
+            canvas.height = innerHeight;
+        }
+        addEventListener("resize", resize);
+        resize();
+
+        const GRID = 64;
+        const PIXEL_SIZE = 4;
+        const EDITOR_SIZE = 16;
+        const DOUBLE_TAP_MS = 330;
+        const DOUBLE_TAP_DIST = 22;
+        const BASE_SPEED = 3;
+        const THRUSTER_BONUS = 2.5;
+        const CHAIR_ENTER_DIST = GRID * 2;
+        const SYSTEM_CELL = GRID * 400;   // spacing between star systems
+        const ZOOM_MIN = 0.15, ZOOM_MAX = 3;
+        let zoom = 1;
+
+        // worldParts: { x, y, partId, rotation }
+        const worldParts = [];
+        // customParts: { id, name, type, data }
+        const customParts = [];
+        let selectedPartId = null;
+        let nextPartId = 1;
+
+        const player = { x: 0, y: 0, size: 18 };
+        let camX = 0, camY = 0;
+        const move = { x: 0, y: 0 };
+
+        // Keyboard state
+        const keys = {};
+
+        // Seat / chair state
+        const seat = {
+            active: false,
+            chairWPIndex: -1,
+            stationIndices: [],
+            dx: 0,
+            dy: 0
+        };
+
+        let nearChairIndex = -1;
+
+        // Part creator type
+        let currentPartType = null;
+
+        // ─── Part data helpers ───────────────────────────────────────────────
+
+        function createEmptyPartData() {
+            return Array.from({ length: EDITOR_SIZE }, () =>
+                Array.from({ length: EDITOR_SIZE }, () => ({ c: null, s: false }))
+            );
+        }
+
+        function clonePartData(data) {
+            return data.map(row => row.map(cell => ({ c: cell.c, s: cell.s })));
+        }
+
+        function getPartById(id) {
+            return customParts.find(p => p.id === id) || null;
+        }
+
+        function getPartIndexById(id) {
+            return customParts.findIndex(p => p.id === id);
+        }
+
+        function ensurePartName(name, fallbackId = null) {
+            const trimmed = (name || "").trim();
+            if (trimmed) return trimmed;
+            if (fallbackId != null) {
+                const n = getPartById(fallbackId)?.name;
+                if (n) return n;
+            }
+            return "Part";
+        }
+
+        function getPartType(partId) {
+            return getPartById(partId)?.type || null;
+        }
+
+        // ─── Editor ──────────────────────────────────────────────────────────
+
+        const editor = {
+            open: false,
+            data: createEmptyPartData(),
+            painting: false,
+            activePointerId: null,
+            loadedPartId: null
+        };
+
+        const pixelGrid = document.getElementById("pixelGrid");
+        const partNameInput = document.getElementById("partName");
+        const colorInput = document.getElementById("color");
+        const solidInput = document.getElementById("solid");
+        const loadPartSelect = document.getElementById("loadPartSelect");
+
+        const editorCells = Array.from({ length: EDITOR_SIZE }, () => Array(EDITOR_SIZE).fill(null));
+
+        function syncEditorCell(x, y) {
+            const cell = editor.data[y][x];
+            const el = editorCells[y][x];
+            if (!el) return;
+            el.style.background = cell.c || "#222";
+        }
+
+        function renderEditorGrid() {
+            pixelGrid.innerHTML = "";
+            for (let y = 0; y < EDITOR_SIZE; y++) {
+                for (let x = 0; x < EDITOR_SIZE; x++) {
+                    const div = document.createElement("div");
+                    div.className = "pix";
+                    div.dataset.x = x;
+                    div.dataset.y = y;
+                    pixelGrid.appendChild(div);
+                    editorCells[y][x] = div;
+                    syncEditorCell(x, y);
+                }
+            }
+        }
+
+        function paintEditorAt(x, y) {
+            if (x < 0 || y < 0 || x >= EDITOR_SIZE || y >= EDITOR_SIZE) return;
+            const cell = editor.data[y][x];
+            cell.c = colorInput.value;
+            cell.s = solidInput.checked;
+            syncEditorCell(x, y);
+        }
+
+        function clearEditorDrawing() {
+            editor.data = createEmptyPartData();
+            for (let y = 0; y < EDITOR_SIZE; y++)
+                for (let x = 0; x < EDITOR_SIZE; x++)
+                    syncEditorCell(x, y);
+        }
+
+        function setEditorPartName(name) { partNameInput.value = name || ""; }
+
+        function setPartType(type) {
+            currentPartType = type;
+            document.getElementById("typeNone").className = "typeBtn" + (type === null ? " active" : "");
+            const chairBtn = document.getElementById("typeChair");
+            chairBtn.className = "typeBtn" + (type === "chair" ? " activeChair" : "");
+            const thrustBtn = document.getElementById("typeThruster");
+            thrustBtn.className = "typeBtn" + (type === "thruster" ? " activeThruster" : "");
+        }
+
+        function openEditor() {
+            editor.open = true;
+            editor.loadedPartId = null;
+            editor.painting = false;
+            editor.activePointerId = null;
+            document.getElementById("editor").style.display = "block";
+            document.getElementById("editor").setAttribute("aria-hidden", "false");
+            setPartType(null);
+            refreshLoadPartOptions();
+            if (!partNameInput.value.trim())
+                setEditorPartName("Part " + (customParts.length + 1));
+        }
+
+        function closeEditor() {
+            editor.open = false;
+            editor.loadedPartId = null;
+            editor.painting = false;
+            editor.activePointerId = null;
+            document.getElementById("editor").style.display = "none";
+            document.getElementById("editor").setAttribute("aria-hidden", "true");
+            clearEditorDrawing();
+            setEditorPartName("");
+            setPartType(null);
+        }
+
+        function saveEditorPart() {
+            const name = ensurePartName(partNameInput.value, editor.loadedPartId);
+            const data = clonePartData(editor.data);
+            const part = { id: nextPartId++, name, type: currentPartType, data };
+            customParts.push(part);
+            selectedPartId = part.id;
+            refreshInventory();
+            refreshLoadPartOptions();
+            closeEditor();
+        }
+
+        function loadPartIntoEditor(part) {
+            if (!part) return;
+            if (!confirm(`Load a copy of "${part.name}" into the Part Creator?\n\nThe original part will not change.`)) return;
+            editor.data = clonePartData(part.data);
+            editor.loadedPartId = part.id;
+            setEditorPartName(part.name);
+            setPartType(part.type || null);
+            for (let y = 0; y < EDITOR_SIZE; y++)
+                for (let x = 0; x < EDITOR_SIZE; x++)
+                    syncEditorCell(x, y);
+        }
+
+        function refreshLoadPartOptions() {
+            loadPartSelect.innerHTML = "";
+            if (customParts.length === 0) {
+                const opt = document.createElement("option");
+                opt.value = "";
+                opt.textContent = "No saved parts";
+                loadPartSelect.appendChild(opt);
+                loadPartSelect.disabled = true;
+                document.getElementById("loadPartBtn").disabled = true;
+                return;
+            }
+            loadPartSelect.disabled = false;
+            document.getElementById("loadPartBtn").disabled = false;
+            customParts.forEach(part => {
+                const opt = document.createElement("option");
+                opt.value = String(part.id);
+                opt.textContent = part.name + (part.type ? ` (${part.type})` : "");
+                loadPartSelect.appendChild(opt);
+            });
+        }
+
+        // ─── Inventory ───────────────────────────────────────────────────────
+
+        function renamePart(partId) {
+            const part = getPartById(partId);
+            if (!part) return;
+            const newName = prompt("Rename this part:", part.name);
+            if (newName === null) return;
+            const trimmed = newName.trim();
+            if (!trimmed) return;
+            part.name = trimmed;
+            refreshInventory();
+            refreshLoadPartOptions();
+        }
+
+        function deletePartById(partId) {
+            const index = getPartIndexById(partId);
+            if (index < 0) return;
+            const part = customParts[index];
+            const placedCount = worldParts.filter(p => p.partId === partId).length;
+            const message = placedCount > 0
+                ? `Delete "${part.name}"?\n\nThis will also remove ${placedCount} placed copy${placedCount === 1 ? "" : "ies"} from the world.`
+                : `Delete "${part.name}"?`;
+            if (!confirm(message + "\n\nThis cannot be undone.")) return;
+            customParts.splice(index, 1);
+            for (let i = worldParts.length - 1; i >= 0; i--) {
+                if (worldParts[i].partId === partId) worldParts.splice(i, 1);
+            }
+            if (selectedPartId === partId) selectedPartId = null;
+            if (editor.loadedPartId === partId) editor.loadedPartId = null;
+            refreshInventory();
+            refreshLoadPartOptions();
+        }
+
+        function refreshInventory() {
+            const inv = document.getElementById("inventory");
+            inv.innerHTML = "";
+            customParts.forEach((part, index) => {
+                const slot = document.createElement("div");
+                let cls = "slot" + (selectedPartId === part.id ? " selected" : "");
+                if (part.type === "chair") cls += " typeChair";
+                if (part.type === "thruster") cls += " typeThruster";
+                slot.className = cls;
+                slot.dataset.partId = String(part.id);
+
+                const name = document.createElement("div");
+                name.className = "slotName";
+                name.textContent = part.name;
+
+                const meta = document.createElement("div");
+                let metaCls = "slotMeta";
+                let metaText = "Part " + (index + 1);
+                if (part.type === "chair") { metaCls += " typeChair"; metaText = "Chair"; }
+                else if (part.type === "thruster") { metaCls += " typeThruster"; metaText = "Thruster"; }
+                meta.className = metaCls;
+                meta.textContent = metaText;
+
+                const actions = document.createElement("div");
+                actions.className = "slotActions";
+
+                const renameBtn = document.createElement("button");
+                renameBtn.className = "miniBtn";
+                renameBtn.type = "button";
+                renameBtn.textContent = "✎";
+                renameBtn.title = "Rename";
+                renameBtn.addEventListener("pointerup", e => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    renamePart(part.id);
+                });
+                actions.appendChild(renameBtn);
+
+                const delBtn = document.createElement("button");
+                delBtn.className = "miniBtn";
+                delBtn.type = "button";
+                delBtn.textContent = "🗑";
+                delBtn.title = "Delete";
+                delBtn.addEventListener("pointerup", e => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    deletePartById(part.id);
+                });
+                actions.appendChild(delBtn);
+
+                slot.appendChild(name);
+                slot.appendChild(meta);
+                slot.appendChild(actions);
+
+                let lastTapTime = 0, lastTapX = 0, lastTapY = 0;
+                slot.addEventListener("pointerup", e => {
+                    if (e.target.closest(".miniBtn")) return;
+                    e.preventDefault();
+                    const now = performance.now();
+                    const dx = e.clientX - lastTapX, dy = e.clientY - lastTapY;
+                    if (now - lastTapTime <= DOUBLE_TAP_MS && Math.hypot(dx, dy) <= DOUBLE_TAP_DIST) {
+                        deletePartById(part.id);
+                        lastTapTime = 0;
+                        return;
+                    }
+                    selectedPartId = part.id;
+                    refreshInventory();
+                    lastTapTime = now;
+                    lastTapX = e.clientX;
+                    lastTapY = e.clientY;
+                });
+                inv.appendChild(slot);
+            });
+        }
+
+        // ─── Universe generation ─────────────────────────────────────────────
+        // The world is split into SYSTEM_CELL-sized chunks. Each chunk
+        // deterministically generates (or not) one star system from its
+        // coordinates, so the universe is infinite but reproducible.
+        // Far-away chunks are simply dropped from the cache.
+
+        const systemCache = new Map();
+        let nearSystems = [];
+
+        function mulberry32(a) {
+            return function () {
+                a |= 0; a = a + 0x6D2B79F5 | 0;
+                let t = Math.imul(a ^ a >>> 15, 1 | a);
+                t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+                return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            };
+        }
+
+        function cellSeed(sx, sy) {
+            let h = Math.imul(sx, 374761393) ^ Math.imul(sy, 668265263) ^ 0x9E3779B9;
+            h = Math.imul(h ^ h >>> 13, 1274126177);
+            return (h ^ h >>> 16) >>> 0;
+        }
+
+        function makeBody(rng, kind, x, y, r) {
+            const hue = Math.floor(rng() * 360);
+            const sat = kind === "moon" ? 5 + rng() * 25 : 25 + rng() * 50;
+            const light = 30 + rng() * 30;
+            const body = { kind, x, y, r, color: `hsl(${hue},${sat}%,${light}%)`, atmoR: 0, cubes: [], bumps: [] };
+            if (rng() < (kind === "planet" ? 0.8 : 0.35)) {
+                body.atmoR = r * (1.8 + rng() * 1.2);
+                body.atmoHue = (hue + rng() * 60 - 30 + 360) % 360;
+            }
+            const cubeCount = 6 + Math.floor(rng() * (kind === "planet" ? 22 : 10));
+            for (let i = 0; i < cubeCount; i++) {
+                const a = rng() * Math.PI * 2, d = rng() * 0.8 * r;
+                body.cubes.push({
+                    x: Math.cos(a) * d, y: Math.sin(a) * d,
+                    s: r * 0.06 + rng() * r * 0.16,
+                    color: `hsl(${hue},${sat}%,${Math.max(8, light + rng() * 30 - 15)}%)`
+                });
+            }
+            const bumpCount = 4 + Math.floor(rng() * 9);
+            for (let i = 0; i < bumpCount; i++) {
+                body.bumps.push({
+                    a: rng() * Math.PI * 2,
+                    w: r * (0.08 + rng() * 0.22), h: r * (0.04 + rng() * 0.14),
+                    color: `hsl(${hue},${sat}%,${Math.max(10, light - 8 + rng() * 16)}%)`
+                });
+            }
+            return body;
+        }
+
+        function generateSystem(sx, sy) {
+            const sys = { sx, sy, bodies: [], asteroids: [] };
+            if (sx === 0 && sy === 0) return sys; // calm empty space at spawn
+            const rng = mulberry32(cellSeed(sx, sy));
+            if (rng() < 0.25) return sys;
+            const cx = (sx + 0.25 + rng() * 0.5) * SYSTEM_CELL;
+            const cy = (sy + 0.25 + rng() * 0.5) * SYSTEM_CELL;
+            const starR = (12 + rng() * 6) * GRID;
+            sys.bodies.push({ kind: "star", x: cx, y: cy, r: starR, atmoR: 0, cubes: [], bumps: [] });
+
+            const planetCount = 2 + Math.floor(rng() * 4);
+            let orbit = starR + 1800 + rng() * 1500;
+            for (let i = 0; i < planetCount && orbit < SYSTEM_CELL * 0.55; i++) {
+                const pr = (5 + rng() * 15) * GRID;
+                orbit += pr + 1600 + rng() * 2400;
+                const ang = rng() * Math.PI * 2;
+                const px = cx + Math.cos(ang) * orbit;
+                const py = cy + Math.sin(ang) * orbit;
+                sys.bodies.push(makeBody(rng, "planet", px, py, pr));
+                const moonCount = Math.floor(rng() * 3.4);
+                let mOrbit = pr + 500 + rng() * 400;
+                for (let m = 0; m < moonCount; m++) {
+                    const mr = (1.5 + rng() * 3.5) * GRID;
+                    mOrbit += mr + 300 + rng() * 900;
+                    const ma = rng() * Math.PI * 2;
+                    sys.bodies.push(makeBody(rng, "moon", px + Math.cos(ma) * mOrbit, py + Math.sin(ma) * mOrbit, mr));
+                }
+                orbit += mOrbit - pr;
+            }
+
+            if (rng() < 0.65) {
+                const beltR = Math.min(orbit + 1800 + rng() * 2500, SYSTEM_CELL * 0.62);
+                const count = 30 + Math.floor(rng() * 50);
+                for (let i = 0; i < count; i++) {
+                    const a = rng() * Math.PI * 2;
+                    const d = beltR + (rng() - 0.5) * 2200;
+                    sys.asteroids.push({
+                        x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d,
+                        s: (1 + rng() * 2) * GRID, rot: rng() * Math.PI,
+                        vx: 0, vy: 0, shade: 35 + Math.floor(rng() * 35)
+                    });
+                }
+            }
+            return sys;
+        }
+
+        function getSystem(sx, sy) {
+            const key = sx + "," + sy;
+            let sys = systemCache.get(key);
+            if (!sys) { sys = generateSystem(sx, sy); systemCache.set(key, sys); }
+            return sys;
+        }
+
+        function refreshNearSystems() {
+            const viewW = canvas.width / zoom, viewH = canvas.height / zoom;
+            const minX = Math.floor((camX - SYSTEM_CELL) / SYSTEM_CELL);
+            const maxX = Math.floor((camX + viewW + SYSTEM_CELL) / SYSTEM_CELL);
+            const minY = Math.floor((camY - SYSTEM_CELL) / SYSTEM_CELL);
+            const maxY = Math.floor((camY + viewH + SYSTEM_CELL) / SYSTEM_CELL);
+            nearSystems = [];
+            for (let sy = minY; sy <= maxY; sy++)
+                for (let sx = minX; sx <= maxX; sx++)
+                    nearSystems.push(getSystem(sx, sy));
+        }
+
+        function celestialCollides(nx, ny, size) {
+            const ccx = nx + size / 2, ccy = ny + size / 2, pr = size / 2;
+            for (const sys of nearSystems) {
+                for (const b of sys.bodies) {
+                    if (Math.hypot(ccx - b.x, ccy - b.y) < b.r + pr) return true;
+                }
+                for (const a of sys.asteroids) {
+                    const h = a.s / 2;
+                    if (nx + size > a.x - h && nx < a.x + h && ny + size > a.y - h && ny < a.y + h) return true;
+                }
+            }
+            return false;
+        }
+
+        function updateAsteroids() {
+            for (const sys of nearSystems) {
+                for (const a of sys.asteroids) {
+                    if (a.vx === 0 && a.vy === 0) continue;
+                    a.x += a.vx; a.y += a.vy;
+                    a.vx *= 0.985; a.vy *= 0.985;
+                    if (Math.abs(a.vx) < 0.02 && Math.abs(a.vy) < 0.02) { a.vx = 0; a.vy = 0; }
+                    for (const b of sys.bodies) {
+                        const d = Math.hypot(a.x - b.x, a.y - b.y);
+                        if (d > 0 && d < b.r + a.s / 2) {
+                            const nx = (a.x - b.x) / d, ny = (a.y - b.y) / d;
+                            const dot = a.vx * nx + a.vy * ny;
+                            a.vx -= 2 * dot * nx; a.vy -= 2 * dot * ny;
+                            a.x = b.x + nx * (b.r + a.s / 2 + 1);
+                            a.y = b.y + ny * (b.r + a.s / 2 + 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Ship (seated station) vs planets/stars/moons
+        function stationHitsBody(dx, dy) {
+            for (const sys of nearSystems) {
+                for (const b of sys.bodies) {
+                    if (Math.hypot(seat.baseX + dx - b.x, seat.baseY + dy - b.y) > b.r + seat.boundR) continue;
+                    for (const i of seat.stationIndices) {
+                        const wp = worldParts[i];
+                        if (!wp) continue;
+                        if (Math.hypot(wp.x * GRID + GRID / 2 + dx - b.x,
+                            wp.y * GRID + GRID / 2 + dy - b.y) < b.r + GRID / 2) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Ship knocks asteroids away on contact
+        function pushAsteroids(spd) {
+            for (const sys of nearSystems) {
+                for (const a of sys.asteroids) {
+                    if (Math.hypot(seat.baseX + seat.dx - a.x, seat.baseY + seat.dy - a.y) > seat.boundR + a.s) continue;
+                    for (const i of seat.stationIndices) {
+                        const wp = worldParts[i];
+                        if (!wp) continue;
+                        const px = wp.x * GRID + seat.dx, py = wp.y * GRID + seat.dy;
+                        const h = a.s / 2;
+                        if (px + GRID > a.x - h && px < a.x + h && py + GRID > a.y - h && py < a.y + h) {
+                            const ccx = px + GRID / 2, ccy = py + GRID / 2;
+                            let dxn = a.x - ccx, dyn = a.y - ccy;
+                            const d = Math.hypot(dxn, dyn) || 1;
+                            dxn /= d; dyn /= d;
+                            const kick = spd * 0.7 + 2;
+                            a.vx = dxn * kick; a.vy = dyn * kick;
+                            a.x += dxn * 4; a.y += dyn * 4;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        let cullTimer = 0;
+        function cullFarAway() {
+            const pcx = Math.floor(player.x / SYSTEM_CELL);
+            const pcy = Math.floor(player.y / SYSTEM_CELL);
+            for (const [key, sys] of systemCache) {
+                if (Math.abs(sys.sx - pcx) > 3 || Math.abs(sys.sy - pcy) > 3) systemCache.delete(key);
+            }
+            if (!seat.active) {
+                const maxD = SYSTEM_CELL * 5;
+                for (let i = worldParts.length - 1; i >= 0; i--) {
+                    if (Math.abs(worldParts[i].x * GRID - player.x) > maxD ||
+                        Math.abs(worldParts[i].y * GRID - player.y) > maxD) worldParts.splice(i, 1);
+                }
+            }
+        }
+
+        // ─── World placement ──────────────────────────────────────────────────
+
+        function getGridCellFromPoint(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (clientX - rect.left) / zoom + camX;
+            const y = (clientY - rect.top) / zoom + camY;
+            return { x: Math.floor(x / GRID), y: Math.floor(y / GRID) };
+        }
+
+        function getPlacedPartAtCell(cellX, cellY) {
+            for (let i = worldParts.length - 1; i >= 0; i--) {
+                const p = worldParts[i];
+                if (p.x === cellX && p.y === cellY) return { part: p, index: i };
+            }
+            return null;
+        }
+
+        function placeSelectedPartAtCell(cellX, cellY) {
+            if (selectedPartId == null) return;
+            if (!getPartById(selectedPartId)) return;
+            worldParts.push({ x: cellX, y: cellY, partId: selectedPartId, rotation: 0 });
+        }
+
+        function deletePlacedPartAtIndex(index) {
+            const item = worldParts[index];
+            if (!item) return;
+            const part = getPartById(item.partId);
+            const name = part ? part.name : "this part";
+            if (!confirm(`Delete this placed copy of "${name}"?\n\nThis cannot be undone.`)) return;
+            worldParts.splice(index, 1);
+            // Invalidate seat if we deleted a station part
+            if (seat.active && seat.stationIndices.includes(index)) {
+                exitChair(true);
+            }
+        }
+
+        // Pinch-to-zoom: track all active pointers on the canvas
+        const canvasPointers = new Map();
+        let pinchDist = 0, multiTouch = false;
+
+        canvas.addEventListener("pointerdown", e => {
+            if (editor.open) return;
+            if (e.button !== undefined && e.button !== 0) return;
+            canvas.setPointerCapture?.(e.pointerId);
+            canvasPointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
+            if (canvasPointers.size === 2) {
+                multiTouch = true;
+                const [p1, p2] = [...canvasPointers.values()];
+                pinchDist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+            }
+            const { x, y } = getGridCellFromPoint(e.clientX, e.clientY);
+            const hit = getPlacedPartAtCell(x, y);
+            if (hit) {
+                canvas.dataset.lastHitX = String(x);
+                canvas.dataset.lastHitY = String(y);
+                canvas.dataset.lastHitTime = String(performance.now());
+            }
+        });
+
+        addEventListener("pointermove", e => {
+            const p = canvasPointers.get(e.pointerId);
+            if (!p) return;
+            p.x = e.clientX; p.y = e.clientY;
+            if (canvasPointers.size === 2) {
+                const [p1, p2] = [...canvasPointers.values()];
+                const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+                if (pinchDist > 0) zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * d / pinchDist));
+                pinchDist = d;
+            }
+        });
+
+        canvas.addEventListener("pointercancel", e => {
+            canvasPointers.delete(e.pointerId);
+            if (canvasPointers.size === 0) multiTouch = false;
+        });
+
+        addEventListener("wheel", e => {
+            if (editor.open) return;
+            zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+        }, { passive: true });
+
+        canvas.addEventListener("pointerup", e => {
+            const start = canvasPointers.get(e.pointerId);
+            canvasPointers.delete(e.pointerId);
+            const wasMulti = multiTouch;
+            if (canvasPointers.size === 0) multiTouch = false;
+            if (editor.open) return;
+            if (seat.active) return;
+            if (wasMulti) return; // pinch gesture, not a tap
+            if (!start || Math.hypot(e.clientX - start.sx, e.clientY - start.sy) > 18) return; // drag, not a tap
+
+            const { x, y } = getGridCellFromPoint(e.clientX, e.clientY);
+            const hit = getPlacedPartAtCell(x, y);
+
+            if (hit) {
+                const now = performance.now();
+                const lastX = Number(canvas.dataset.lastHitX || "-9999");
+                const lastY = Number(canvas.dataset.lastHitY || "-9999");
+                const lastTime = Number(canvas.dataset.lastHitTime || "0");
+                const sameCell = lastX === x && lastY === y;
+                const fastEnough = now - lastTime <= DOUBLE_TAP_MS;
+
+                if (sameCell && fastEnough) {
+                    // Double-tap: delete
+                    deletePlacedPartAtIndex(hit.index);
+                    canvas.dataset.lastHitTime = "0";
+                } else {
+                    // Single tap: rotate 90° CW
+                    hit.part.rotation = ((hit.part.rotation || 0) + 90) % 360;
+                    canvas.dataset.lastHitX = String(x);
+                    canvas.dataset.lastHitY = String(y);
+                    canvas.dataset.lastHitTime = String(now);
+                }
+                return;
+            }
+
+            placeSelectedPartAtCell(x, y);
+            canvas.dataset.lastHitTime = "0";
+        });
+
+        // ─── Joystick ────────────────────────────────────────────────────────
+
+        const joy = document.getElementById("joy");
+        const stick = document.getElementById("stick");
+        let dragging = false, joyPointerId = null;
+
+        joy.addEventListener("pointerdown", e => {
+            e.preventDefault();
+            dragging = true;
+            joyPointerId = e.pointerId;
+            joy.setPointerCapture?.(e.pointerId);
+        });
+
+        addEventListener("pointerup", e => {
+            if (joyPointerId !== null && e.pointerId !== joyPointerId) return;
+            dragging = false;
+            joyPointerId = null;
+            move.x = 0; move.y = 0;
+            stick.style.left = "40px";
+            stick.style.top = "40px";
+        });
+
+        addEventListener("pointercancel", () => {
+            dragging = false;
+            joyPointerId = null;
+            move.x = 0; move.y = 0;
+            stick.style.left = "40px";
+            stick.style.top = "40px";
+        });
+
+        addEventListener("pointermove", e => {
+            if (!dragging || e.pointerId !== joyPointerId) return;
+            const r = joy.getBoundingClientRect();
+            let x = e.clientX - r.left - 60;
+            let y = e.clientY - r.top - 60;
+            const d = Math.hypot(x, y);
+            if (d > 40) { x = x / d * 40; y = y / d * 40; }
+            move.x = x / 40;
+            move.y = y / 40;
+            stick.style.left = (40 + x) + "px";
+            stick.style.top = (40 + y) + "px";
+        });
+
+        // ─── Keyboard ────────────────────────────────────────────────────────
+
+        addEventListener("keydown", e => {
+            keys[e.key] = true;
+            if ((e.key === "e" || e.key === "E") && !editor.open) {
+                if (seat.active) exitChair(false);
+                else if (nearChairIndex >= 0) enterChair(nearChairIndex);
+            }
+        });
+        addEventListener("keyup", e => { keys[e.key] = false; });
+
+        function getKeyMove() {
+            let kx = 0, ky = 0;
+            if (keys["ArrowLeft"] || keys["a"] || keys["A"]) kx -= 1;
+            if (keys["ArrowRight"] || keys["d"] || keys["D"]) kx += 1;
+            if (keys["ArrowUp"] || keys["w"] || keys["W"]) ky -= 1;
+            if (keys["ArrowDown"] || keys["s"] || keys["S"]) ky += 1;
+            if (kx !== 0 && ky !== 0) { kx *= 0.707; ky *= 0.707; }
+            return { kx, ky };
+        }
+
+        // ─── Chair / station ─────────────────────────────────────────────────
+
+        function getConnectedParts(startIndex) {
+            const visited = new Set([startIndex]);
+            const queue = [startIndex];
+            while (queue.length) {
+                const idx = queue.shift();
+                const p = worldParts[idx];
+                for (let i = 0; i < worldParts.length; i++) {
+                    if (visited.has(i)) continue;
+                    const q = worldParts[i];
+                    const dx = Math.abs(q.x - p.x);
+                    const dy = Math.abs(q.y - p.y);
+                    if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+                        visited.add(i);
+                        queue.push(i);
+                    }
+                }
+            }
+            return [...visited];
+        }
+
+        function findNearChair() {
+            if (seat.active) return -1;
+            const px = player.x + player.size / 2;
+            const py = player.y + player.size / 2;
+            for (let i = 0; i < worldParts.length; i++) {
+                if (getPartType(worldParts[i].partId) !== "chair") continue;
+                const wp = worldParts[i];
+                const cx = wp.x * GRID + GRID / 2;
+                const cy = wp.y * GRID + GRID / 2;
+                if (Math.hypot(px - cx, py - cy) < CHAIR_ENTER_DIST) return i;
+            }
+            return -1;
+        }
+
+        function getSeatSpeed() {
+            let thrusters = 0;
+            for (const i of seat.stationIndices) {
+                if (getPartType(worldParts[i].partId) === "thruster") thrusters++;
+            }
+            return BASE_SPEED + thrusters * THRUSTER_BONUS;
+        }
+
+        function enterChair(chairWPIndex) {
+            const wp = worldParts[chairWPIndex];
+            seat.active = true;
+            seat.chairWPIndex = chairWPIndex;
+            seat.stationIndices = getConnectedParts(chairWPIndex);
+            seat.dx = 0;
+            seat.dy = 0;
+            seat.baseX = wp.x * GRID + GRID / 2;
+            seat.baseY = wp.y * GRID + GRID / 2;
+            let boundR = GRID;
+            for (const i of seat.stationIndices) {
+                const q = worldParts[i];
+                boundR = Math.max(boundR, Math.hypot((q.x - wp.x) * GRID, (q.y - wp.y) * GRID) + GRID);
+            }
+            seat.boundR = boundR;
+            player.x = wp.x * GRID + GRID / 2 - player.size / 2;
+            player.y = wp.y * GRID + GRID / 2 - player.size / 2;
+            updateSitButton();
+        }
+
+        function exitChair(force = false) {
+            // Bake the pixel offset into grid positions (snap to nearest cell)
+            const snapDX = Math.round(seat.dx / GRID) * GRID;
+            const snapDY = Math.round(seat.dy / GRID) * GRID;
+            const snapGridX = Math.round(seat.dx / GRID);
+            const snapGridY = Math.round(seat.dy / GRID);
+
+            for (const i of seat.stationIndices) {
+                if (i >= 0 && i < worldParts.length) {
+                    worldParts[i].x += snapGridX;
+                    worldParts[i].y += snapGridY;
+                }
+            }
+
+            // Eject player just outside the chair
+            const wp = worldParts[seat.chairWPIndex];
+            if (wp) {
+                player.x = wp.x * GRID + GRID / 2 - player.size / 2;
+                player.y = wp.y * GRID + GRID + 4;
+            } else {
+                player.x += snapDX;
+                player.y += snapDY;
+            }
+
+            seat.active = false;
+            seat.chairWPIndex = -1;
+            seat.stationIndices = [];
+            seat.dx = 0;
+            seat.dy = 0;
+            updateSitButton();
+        }
+
+        function updateSitButton() {
+            const btn = document.getElementById("sitBtn");
+            if (seat.active) {
+                btn.style.display = "block";
+                btn.textContent = "Exit [E]";
+                btn.className = "exiting";
+            } else if (nearChairIndex >= 0) {
+                btn.style.display = "block";
+                btn.textContent = "Sit [E]";
+                btn.className = "";
+            } else {
+                btn.style.display = "none";
+            }
+        }
+
+        document.getElementById("sitBtn").addEventListener("pointerup", e => {
+            e.preventDefault();
+            if (seat.active) exitChair(false);
+            else if (nearChairIndex >= 0) enterChair(nearChairIndex);
+        });
+
+        // ─── Collision ───────────────────────────────────────────────────────
+
+        function collides(nx, ny) {
+            if (celestialCollides(nx, ny, player.size)) return true;
+            for (let i = 0; i < worldParts.length; i++) {
+                // Skip station parts while seated (you're inside the structure)
+                if (seat.active && seat.stationIndices.includes(i)) continue;
+
+                const placed = worldParts[i];
+                const part = getPartById(placed.partId);
+                if (!part) continue;
+
+                const rot = placed.rotation || 0;
+                const partCX = placed.x * GRID + GRID / 2;
+                const partCY = placed.y * GRID + GRID / 2;
+                const rad = rot * Math.PI / 180;
+                const cos = Math.cos(rad);
+                const sin = Math.sin(rad);
+
+                for (let py = 0; py < EDITOR_SIZE; py++) {
+                    for (let px = 0; px < EDITOR_SIZE; px++) {
+                        const cell = part.data[py][px];
+                        if (!cell.s) continue;
+
+                        let rx, ry;
+                        if (rot === 0) {
+                            rx = placed.x * GRID + px * PIXEL_SIZE;
+                            ry = placed.y * GRID + py * PIXEL_SIZE;
+                        } else {
+                            const lx = px * PIXEL_SIZE + PIXEL_SIZE / 2 - GRID / 2;
+                            const ly = py * PIXEL_SIZE + PIXEL_SIZE / 2 - GRID / 2;
+                            rx = partCX + lx * cos - ly * sin - PIXEL_SIZE / 2;
+                            ry = partCY + lx * sin + ly * cos - PIXEL_SIZE / 2;
+                        }
+
+                        if (
+                            nx + player.size > rx &&
+                            nx < rx + PIXEL_SIZE &&
+                            ny + player.size > ry &&
+                            ny < ry + PIXEL_SIZE
+                        ) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // ─── Update ──────────────────────────────────────────────────────────
+
+        function update() {
+            refreshNearSystems();
+
+            const { kx, ky } = getKeyMove();
+            let mx = Math.max(-1, Math.min(1, move.x + kx));
+            let my = Math.max(-1, Math.min(1, move.y + ky));
+
+            if (seat.active) {
+                const spd = getSeatSpeed();
+                const ndx = seat.dx + mx * spd;
+                const ndy = seat.dy + my * spd;
+                // "stuck" escape hatch: if already overlapping a body, allow movement out
+                const stuck = stationHitsBody(seat.dx, seat.dy);
+                if (stuck || !stationHitsBody(ndx, seat.dy)) seat.dx = ndx;
+                if (stuck || !stationHitsBody(seat.dx, ndy)) seat.dy = ndy;
+                pushAsteroids(spd);
+
+                const wp = worldParts[seat.chairWPIndex];
+                if (wp) {
+                    player.x = wp.x * GRID + seat.dx + GRID / 2 - player.size / 2;
+                    player.y = wp.y * GRID + seat.dy + GRID / 2 - player.size / 2;
+                }
+            } else {
+                const nx = player.x + mx * BASE_SPEED;
+                const ny = player.y + my * BASE_SPEED;
+                const stuck = collides(player.x, player.y);
+                if (stuck || !collides(nx, player.y)) player.x = nx;
+                if (stuck || !collides(player.x, ny)) player.y = ny;
+            }
+
+            updateAsteroids();
+
+            const prevNear = nearChairIndex;
+            nearChairIndex = seat.active ? -1 : findNearChair();
+            if (nearChairIndex !== prevNear) updateSitButton();
+
+            camX = player.x + player.size / 2 - canvas.width / (2 * zoom);
+            camY = player.y + player.size / 2 - canvas.height / (2 * zoom);
+
+            if (++cullTimer >= 300) { cullTimer = 0; cullFarAway(); }
+        }
+
+        // ─── Draw ────────────────────────────────────────────────────────────
+
+        function drawPart(part, gx, gy, rotation) {
+            if (!part) return;
+            ctx.save();
+            ctx.translate(gx - camX + GRID / 2, gy - camY + GRID / 2);
+            ctx.rotate((rotation || 0) * Math.PI / 180);
+            ctx.translate(-GRID / 2, -GRID / 2);
+            for (let y = 0; y < EDITOR_SIZE; y++) {
+                for (let x = 0; x < EDITOR_SIZE; x++) {
+                    const p = part.data[y][x];
+                    if (!p.c) continue;
+                    ctx.fillStyle = p.c;
+                    ctx.fillRect(x * PIXEL_SIZE, y * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE);
+                }
+            }
+            ctx.restore();
+        }
+
+        function drawStar(sx, sy, r) {
+            const glow = ctx.createRadialGradient(sx, sy, r * 0.4, sx, sy, r * 3.5);
+            glow.addColorStop(0, "rgba(255,255,240,0.9)");
+            glow.addColorStop(0.35, "rgba(255,240,200,0.25)");
+            glow.addColorStop(1, "rgba(255,230,180,0)");
+            ctx.fillStyle = glow;
+            ctx.beginPath(); ctx.arc(sx, sy, r * 3.5, 0, Math.PI * 2); ctx.fill();
+
+            // brightness streaks
+            ctx.save();
+            ctx.translate(sx, sy);
+            for (const [ang, len] of [[0, r * 6], [Math.PI / 2, r * 6], [Math.PI / 4, r * 3.2], [-Math.PI / 4, r * 3.2]]) {
+                ctx.save();
+                ctx.rotate(ang);
+                const g = ctx.createLinearGradient(-len, 0, len, 0);
+                g.addColorStop(0, "rgba(255,255,255,0)");
+                g.addColorStop(0.5, "rgba(255,255,255,0.4)");
+                g.addColorStop(1, "rgba(255,255,255,0)");
+                ctx.fillStyle = g;
+                ctx.fillRect(-len, -r * 0.045, len * 2, r * 0.09);
+                ctx.restore();
+            }
+            ctx.restore();
+
+            ctx.fillStyle = "#fff";
+            ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.fill();
+        }
+
+        function drawPlanet(sx, sy, b) {
+            if (b.atmoR) {
+                const g = ctx.createRadialGradient(sx, sy, b.r * 0.8, sx, sy, b.atmoR);
+                g.addColorStop(0, `hsla(${b.atmoHue},70%,60%,0.85)`);
+                g.addColorStop(0.45, `hsla(${b.atmoHue},70%,55%,0.35)`);
+                g.addColorStop(1, `hsla(${b.atmoHue},70%,50%,0)`);
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(sx, sy, b.atmoR, 0, Math.PI * 2); ctx.fill();
+            }
+            // rim rock/ground formations (stick out past the surface)
+            for (const f of b.bumps) {
+                ctx.save();
+                ctx.translate(sx, sy);
+                ctx.rotate(f.a);
+                ctx.fillStyle = f.color;
+                ctx.fillRect(-f.w / 2, -(b.r + f.h), f.w, f.h + b.r * 0.2);
+                ctx.restore();
+            }
+            ctx.fillStyle = b.color;
+            ctx.beginPath(); ctx.arc(sx, sy, b.r, 0, Math.PI * 2); ctx.fill();
+            // scattered surface cubes
+            ctx.save();
+            ctx.beginPath(); ctx.arc(sx, sy, b.r, 0, Math.PI * 2); ctx.clip();
+            for (const c of b.cubes) {
+                ctx.fillStyle = c.color;
+                ctx.fillRect(sx + c.x - c.s / 2, sy + c.y - c.s / 2, c.s, c.s);
+            }
+            ctx.restore();
+        }
+
+        function drawCelestialBodies() {
+            const viewW = canvas.width / zoom, viewH = canvas.height / zoom;
+            for (const sys of nearSystems) {
+                for (const b of sys.bodies) {
+                    const margin = Math.max(b.atmoR, b.kind === "star" ? b.r * 6 : b.r * 1.3);
+                    if (b.x + margin < camX || b.x - margin > camX + viewW ||
+                        b.y + margin < camY || b.y - margin > camY + viewH) continue;
+                    const sx = b.x - camX, sy = b.y - camY;
+                    if (b.kind === "star") drawStar(sx, sy, b.r);
+                    else drawPlanet(sx, sy, b);
+                }
+                for (const a of sys.asteroids) {
+                    if (a.x + a.s < camX || a.x - a.s > camX + viewW ||
+                        a.y + a.s < camY || a.y - a.s > camY + viewH) continue;
+                    ctx.save();
+                    ctx.translate(a.x - camX, a.y - camY);
+                    ctx.rotate(a.rot);
+                    ctx.fillStyle = `hsl(30,12%,${a.shade}%)`;
+                    ctx.fillRect(-a.s / 2, -a.s / 2, a.s, a.s);
+                    ctx.fillStyle = `hsl(30,12%,${a.shade - 12}%)`;
+                    ctx.fillRect(-a.s / 2, a.s * 0.15, a.s, a.s * 0.35);
+                    ctx.restore();
+                }
+            }
+        }
+
+        function drawMinimap() {
+            const R = Math.min(80, canvas.width * 0.18);
+            const mx = canvas.width - R - 14, my = R + 14;
+            const range = SYSTEM_CELL * 1.7;
+            const scale = R / range;
+            const pcx = player.x + player.size / 2;
+            const pcy = player.y + player.size / 2;
+
+            ctx.save();
+            ctx.beginPath(); ctx.arc(mx, my, R, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(2,4,18,0.6)";
+            ctx.fill();
+            ctx.strokeStyle = "rgba(160,200,255,0.4)";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.clip();
+
+            const c0x = Math.floor((pcx - range) / SYSTEM_CELL), c1x = Math.floor((pcx + range) / SYSTEM_CELL);
+            const c0y = Math.floor((pcy - range) / SYSTEM_CELL), c1y = Math.floor((pcy + range) / SYSTEM_CELL);
+            for (let cy = c0y; cy <= c1y; cy++) {
+                for (let cx = c0x; cx <= c1x; cx++) {
+                    const sys = getSystem(cx, cy);
+                    for (const b of sys.bodies) {
+                        const dx = (b.x - pcx) * scale, dy = (b.y - pcy) * scale;
+                        if (dx * dx + dy * dy > R * R) continue;
+                        let dotR, color;
+                        if (b.kind === "star") { dotR = 4; color = "#fff6d0"; }
+                        else if (b.kind === "planet") { dotR = 2.5; color = b.color; }
+                        else { dotR = 1.3; color = "#99a"; }
+                        ctx.fillStyle = color;
+                        ctx.beginPath(); ctx.arc(mx + dx, my + dy, dotR, 0, Math.PI * 2); ctx.fill();
+                    }
+                }
+            }
+            ctx.fillStyle = "cyan";
+            ctx.beginPath(); ctx.arc(mx, my, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        }
+
+        function drawThrusterGlow(gx, gy) {
+            if (!seat.active) return;
+            const mx = move.x + getKeyMove().kx;
+            const my = move.y + getKeyMove().ky;
+            if (Math.hypot(mx, my) < 0.15) return;
+            const sx = gx - camX + GRID / 2;
+            const sy = gy - camY + GRID / 2;
+            const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, GRID * 0.9);
+            grad.addColorStop(0, "rgba(255,190,30,0.55)");
+            grad.addColorStop(0.5, "rgba(255,80,0,0.3)");
+            grad.addColorStop(1, "rgba(255,20,0,0)");
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(sx, sy, GRID * 0.9, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawHUD() {
+            if (!seat.active) return;
+            let thrusters = 0;
+            for (const i of seat.stationIndices) {
+                if (getPartType(worldParts[i]?.partId) === "thruster") thrusters++;
+            }
+            const spd = getSeatSpeed();
+            ctx.save();
+            ctx.font = "13px monospace";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            const label = `Piloting  |  Thrusters: ${thrusters}  |  Speed: ${spd.toFixed(1)}  |  Parts: ${seat.stationIndices.length}`;
+            const pad = 8;
+            const tw = ctx.measureText(label).width;
+            ctx.fillStyle = "rgba(0,0,0,0.6)";
+            ctx.fillRect(8, 8, tw + pad * 2, 26);
+            ctx.fillStyle = "#99ddff";
+            ctx.fillText(label, 8 + pad, 12);
+            ctx.restore();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.scale(zoom, zoom);
+            const viewW = canvas.width / zoom, viewH = canvas.height / zoom;
+
+            // Grid lines (hidden when zoomed far out)
+            if (zoom > 0.45) {
+                ctx.strokeStyle = "#1a1a1a";
+                ctx.lineWidth = 1 / zoom;
+                for (let x = -camX % GRID; x < viewW; x += GRID) {
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, viewH); ctx.stroke();
+                }
+                for (let y = -camY % GRID; y < viewH; y += GRID) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(viewW, y); ctx.stroke();
+                }
+                ctx.lineWidth = 1;
+            }
+
+            drawCelestialBodies();
+
+            // World parts
+            for (let i = 0; i < worldParts.length; i++) {
+                const p = worldParts[i];
+                const part = getPartById(p.partId);
+                if (!part) continue;
+
+                let gx = p.x * GRID;
+                let gy = p.y * GRID;
+                if (seat.active && seat.stationIndices.includes(i)) {
+                    gx += seat.dx;
+                    gy += seat.dy;
+                }
+
+                // Thruster glow (behind part pixels)
+                if (part.type === "thruster") drawThrusterGlow(gx, gy);
+
+                drawPart(part, gx, gy, p.rotation || 0);
+
+                // Rotation indicator (small arc in corner when non-zero)
+                if (p.rotation) {
+                    const sx = gx - camX;
+                    const sy = gy - camY;
+                    ctx.save();
+                    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(sx + GRID - 8, sy + 8, 5, 0, (p.rotation / 360) * Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // Player (hidden while seated — they're inside the chair)
+            if (!seat.active) {
+                ctx.fillStyle = "cyan";
+                ctx.fillRect(player.x - camX, player.y - camY, player.size, player.size);
+            }
+
+            ctx.restore();
+
+            drawHUD();
+            drawMinimap();
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // ─── Editor events ───────────────────────────────────────────────────
+
+        document.getElementById("add").addEventListener("click", () => {
+            clearEditorDrawing();
+            setEditorPartName("Part " + (customParts.length + 1));
+            openEditor();
+        });
+
+        document.getElementById("savePart").addEventListener("click", saveEditorPart);
+        document.getElementById("cancelEditor").addEventListener("click", closeEditor);
+
+        document.getElementById("loadPartBtn").addEventListener("click", () => {
+            const id = Number(loadPartSelect.value);
+            loadPartIntoEditor(getPartById(id));
+        });
+
+        document.getElementById("typeNone").addEventListener("click", () => setPartType(null));
+        document.getElementById("typeChair").addEventListener("click", () => setPartType("chair"));
+        document.getElementById("typeThruster").addEventListener("click", () => setPartType("thruster"));
+
+        function editorCellFromEvent(e) {
+            const target = e.target.closest(".pix");
+            if (!target) return null;
+            return { x: Number(target.dataset.x), y: Number(target.dataset.y) };
+        }
+
+        pixelGrid.addEventListener("pointerdown", e => {
+            if (!editor.open) return;
+            e.preventDefault();
+            editor.painting = true;
+            editor.activePointerId = e.pointerId;
+            pixelGrid.setPointerCapture?.(e.pointerId);
+            const cell = editorCellFromEvent(e);
+            if (cell) paintEditorAt(cell.x, cell.y);
+        });
+
+        pixelGrid.addEventListener("pointermove", e => {
+            if (!editor.open || !editor.painting || e.pointerId !== editor.activePointerId) return;
+            e.preventDefault();
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            const cellEl = el?.closest?.(".pix");
+            if (!cellEl) return;
+            paintEditorAt(Number(cellEl.dataset.x), Number(cellEl.dataset.y));
+        });
+
+        addEventListener("pointerup", e => {
+            if (editor.activePointerId !== null && e.pointerId === editor.activePointerId) {
+                editor.painting = false;
+                editor.activePointerId = null;
+            }
+        });
+
+        addEventListener("pointercancel", e => {
+            if (editor.activePointerId !== null && e.pointerId === editor.activePointerId) {
+                editor.painting = false;
+                editor.activePointerId = null;
+            }
+        });
+
+        // ─── Init ────────────────────────────────────────────────────────────
+
+        renderEditorGrid();
+        clearEditorDrawing();
+        refreshInventory();
+        refreshLoadPartOptions();
+
+        // Nudge the spawn point out of any generated body, just in case
+        (function ensureClearSpawn() {
+            camX = player.x; camY = player.y;
+            refreshNearSystems();
+            let guard = 0;
+            while (celestialCollides(player.x, player.y, player.size) && guard++ < 400) {
+                player.x += 150;
+                camX = player.x;
+                refreshNearSystems();
+            }
+        })();
+
+        loop();
+    </script>
+</body>
+
+</html>
